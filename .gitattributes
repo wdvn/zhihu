@@ -1,0 +1,6 @@
+font_1.ttf filter=lfs diff=lfs merge=lfs -text
+font_b.ttf filter=lfs diff=lfs merge=lfs -text
+font_c.ttf filter=lfs diff=lfs merge=lfs -text
+font_e.ttf filter=lfs diff=lfs merge=lfs -text
+font_a.otf filter=lfs diff=lfs merge=lfs -text
+font_d.otf filter=lfs diff=lfs merge=lfs -text
