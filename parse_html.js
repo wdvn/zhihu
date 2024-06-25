@@ -13,25 +13,30 @@ class FontFile {
 }
 
 function convertBaseToTTF(fileName, s) {
-    fs.writeFileSync(`${fileName}.ttf`, s);
+    fs.writeFileSync(fileName, s);
 }
 
-function parseFontFromHtml(filePath) {
+function parseFontFromHtml(content) {
     try {
-        const content = fs.readFileSync(filePath, {encoding: 'utf8'});
         const regex = /@font-face\s*{[^}]*}/g;
         const matches = content.match(regex);
         const result = [];
-
+        let mainContent = content.match(/<div\s+id="manuscript"[^>]*>/);
+        if (mainContent && mainContent.length > 0) {
+            mainContent = mainContent[0]
+        }
         matches.forEach(match => {
             if (/font-weight:\s*bold/.test(match)) return;
             if (!/url\(data:font\/ttf;[^)]*\)/.test(match)) return;
 
             const fontNameMatch = match.match(/font-family\s*:\s*["'](.*)["']/);
             const base64Match = match.match(/url\(.*base64,(.*)\)/);
-
             if (fontNameMatch && base64Match) {
                 const fontName = fontNameMatch[1];
+                if (!mainContent.includes(fontName)) {
+                    return;
+                }
+
                 const base64Data = base64Match[1];
                 try {
                     const srcDecoded = Buffer.from(base64Data, 'base64');
@@ -85,8 +90,6 @@ async function listAllCharInCmap(font) {
         // Chuyển đổi từ mã glyph sang ký tự
         return String.fromCharCode(key);
     });
-
-    console.log('Danh sách ký tự trong font:', characters);
     return characters;
 }
 

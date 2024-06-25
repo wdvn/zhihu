@@ -52,21 +52,25 @@ async function compareChar(fontSource, fontMod, sourceChar, modChar) {
 
     const imgMod = PNG.sync.read(fs.readFileSync(f2))
     const diff = new PNG({width, height})
-    const numDiffPixels = pixelmatch(imgSrc.data, imgMod.data, diff.data, width, height, {
+    return pixelmatch(imgSrc.data, imgMod.data, diff.data, width, height, {
         alpha: 0,
         threshold: 0.2,
         includeAA: true,
     })
-
-    const totalPixels = width * height;
-    return numDiffPixels
 }
 
-async function scanCharSwapInSource(fontSource, fontMod, modChar) {
+async function scanCharSwapInSource(fontSource, fontMod, modChar, rangeChar) {
     let found = '';
     let confidence = 40000;
     const baseCmap = await listAllCharInCmap(fontSource)
+    let baseMp = {}
     for (let char of baseCmap) {
+        baseMp[char] = 1
+    }
+    for (let char of rangeChar) {
+        if (!baseMp[char]) {
+            console.log(`Ký tự này không có trong font gốc: ${char}`)
+        }
         const out = await compareChar(fontSource, fontMod, char, modChar)
         if (out < confidence) {
             confidence = out
@@ -78,43 +82,42 @@ async function scanCharSwapInSource(fontSource, fontMod, modChar) {
 
 async function main() {
     const fontSource = await opentype.load('Source Han Sans CN Regular.ttf')
-    //
-    // // save_char(font_1, '作', 'a1')
-    // // save_char(font_2, '同', 'a2')
-    //
-    // save_char(font_1, '不', 'b1')
-    // save_char(font_2, '学', 'b2')
-    const list_fonts = parseFontFromHtml('zhihu.html');
-    // for (let item of list_fonts) {
-    //     convertBaseToTTF(item.fontName, item.source)
-    //     const chars = await listAllCharInCmap(`${item.fontName}.ttf`)
-    //     console.log(chars)
-    //     compareChar(fontSource,)
-    // }
-    const fontMod = opentype.loadSync(`${list_fonts[0].fontName}.ttf`, {})
-    const modCmap = await listAllCharInCmap(fontMod)
+    const fileHtml = 'zhihu.html';
+    let content = fs.readFileSync(fileHtml, {encoding: 'utf8'});
+
+    const list_fonts = parseFontFromHtml(content);
     let mapping = {};
-    for (let modChar of modCmap) {
-        const origin = await scanCharSwapInSource(fontSource, fontMod, modChar);
-        if (origin) {
-            mapping[modChar] = origin
+    const mappingPath = `${PREFIX_PATH}/${getMd5(content)}.json`;
+    if (!fs.existsSync(mappingPath)) {
+        console.log(`Analyze for swapping characters`);
+        for (let fm of list_fonts) {
+            console.log(`Loading font ${fm.fontName}`)
+            const fontPath = `${PREFIX_PATH}/${fm.fontName}.ttf`
+            if (!fs.existsSync(fontPath)) {
+                await convertBaseToTTF(fontPath, fm.source)
+            }
+
+            const fontMod = opentype.loadSync(fontPath, {})
+            const modCmap = await listAllCharInCmap(fontMod)
+            for (let modChar of modCmap) {
+                const origin = await scanCharSwapInSource(fontSource, fontMod, modChar, modCmap);
+                if (origin) {
+                    mapping[modChar] = origin
+                }
+            }
         }
+        fs.writeFileSync(mappingPath, JSON.stringify(mapping))
+    } else {
+        console.log(`Using cache for ${fileHtml}`);
+        let contentMapping = fs.readFileSync(mappingPath, {encoding: 'utf8'});
+        mapping = JSON.parse(contentMapping);
     }
-    console.log(JSON.stringify(mapping))
+    for (let key of Object.keys(mapping)) {
+        content = content.replace(key, mapping[key])
+    }
+
+    fs.writeFileSync('zhihu_copy.html', content)
 }
 
 
 main()
-//
-// const img1 = PNG.sync.read(fs.readFileSync('b1.png'))
-// const img2 = PNG.sync.read(fs.readFileSync('b2.png'))
-// const { width, height } = img1
-// const diff = new PNG({ width, height })
-//
-// pixelmatch(img1.data, img2.data, diff.data, width, height, {
-//   alpha: 0,
-//   threshold: 0.2,
-//   includeAA: true,
-// })
-//
-// fs.writeFileSync('diff.png', PNG.sync.write(diff))
