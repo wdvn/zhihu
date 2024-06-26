@@ -7,9 +7,9 @@ const pixelmatch = require('pixelmatch')
 
 const opentype = require('opentype.js')
 const {createCanvas, loadImage} = require('canvas')
-const {features} = require('process')
 const {parseFontFromHtml, convertBaseToTTF, listAllCharInCmap, getMd5, PREFIX_PATH} = require("./parse_html");
-const {ssim} = require("ssim.js");
+const path = require('path');
+const puppeteer = require('puppeteer');
 
 function get_path(font, char) {
     const glyph = font.getPath(char)
@@ -80,6 +80,57 @@ async function scanCharSwapInSource(fontSource, fontMod, modChar, rangeChar) {
     return found
 }
 
+
+async function captrueFileHtml(fileName) {
+    const filePath = path.resolve(__dirname, fileName);
+    const fileUrl = `file://${filePath}`;
+
+    // Khởi chạy trình duyệt
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+
+    // Mở file HTML
+    await page.goto(fileUrl, {waitUntil: 'networkidle2'});
+
+    // Chụp ảnh màn hình
+    await page.screenshot({path: fileName.replace('.html', '.png'), fullPage: true});
+
+    // Đóng trình duyệt
+    await browser.close();
+}
+
+async function drawDiffImg(f1, f2) {
+    const imgSrc = PNG.sync.read(fs.readFileSync(f1))
+    const {width, height} = imgSrc
+
+    const imgMod = PNG.sync.read(fs.readFileSync(f2))
+    const diff = new PNG({width, height})
+    await pixelmatch(imgSrc.data, imgMod.data, diff.data, width, height, {
+        alpha: 0.5,
+        threshold: 0.1,
+        includeAA: false,
+        diffColor: [255, 0, 0], // Color for different pixels: Red
+        diffColorAlt: [0, 255, 0], //
+    })
+    fs.writeFileSync('diff.png', PNG.sync.write(diff));
+    diff.show();
+}
+
+async function replaceByFontMapping(content, mapping) {
+    let result = '';
+    for (let char of content) {
+        if (mapping[char]) {
+            result += mapping[char]
+        } else {
+            result += char
+        }
+    }
+
+    return result
+
+}
+
+
 async function main() {
     const fontSource = await opentype.load('Source Han Sans CN Regular.ttf')
     const fileHtml = 'zhihu.html';
@@ -87,6 +138,7 @@ async function main() {
 
     const list_fonts = parseFontFromHtml(content);
     let mapping = {};
+    let mpReplace = {};
     const mappingPath = `${PREFIX_PATH}/${getMd5(content)}.json`;
     if (!fs.existsSync(mappingPath)) {
         console.log(`Analyze for swapping characters`);
@@ -101,8 +153,9 @@ async function main() {
             const modCmap = await listAllCharInCmap(fontMod)
             for (let modChar of modCmap) {
                 const origin = await scanCharSwapInSource(fontSource, fontMod, modChar, modCmap);
-                if (origin) {
-                    mapping[modChar] = origin
+                if (origin && !mpReplace[origin]) {
+                    mapping[modChar] = origin;
+                    mpReplace[origin] = 1
                 }
             }
         }
@@ -112,11 +165,16 @@ async function main() {
         let contentMapping = fs.readFileSync(mappingPath, {encoding: 'utf8'});
         mapping = JSON.parse(contentMapping);
     }
-    for (let key of Object.keys(mapping)) {
-        content = content.replace(key, mapping[key])
-    }
+    console.log(`Replace character by font`);
 
-    fs.writeFileSync('zhihu_copy.html', content)
+    content = await replaceByFontMapping(content, mapping);
+    const fileEdit = `${fileHtml.replace('.html', '_copy')}.html`
+    fs.writeFileSync(fileEdit, content);
+    await captrueFileHtml(fileHtml);
+    await captrueFileHtml(fileEdit)
+    await drawDiffImg(fileHtml.replace('.html', '.png'), fileEdit.replace('.html', '.png'))
+
+    console.log('Done!!!')
 }
 
 
