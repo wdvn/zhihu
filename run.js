@@ -29,8 +29,7 @@ async function save_char(font, char, type = 'mod') {
     const canvas = createCanvas(200, 200)
     const ctx = canvas.getContext('2d')
 
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fillRect(0, 0, 200, 200)
+    ctx.fillStyle = 'black'
 
     path.draw(ctx)
 
@@ -139,6 +138,8 @@ async function main() {
     const list_fonts = parseFontFromHtml(content);
     let mapping = {};
     let mpReplace = {};
+    let fontNames = [];
+
     const mappingPath = `${PREFIX_PATH}/${getMd5(content)}.json`;
     if (!fs.existsSync(mappingPath)) {
         console.log(`Analyze for swapping characters`);
@@ -158,15 +159,22 @@ async function main() {
                     mpReplace[origin] = 1
                 }
             }
+            fontNames.push(fm.fontName)
         }
-        fs.writeFileSync(mappingPath, JSON.stringify(mapping))
+        fs.writeFileSync(mappingPath, JSON.stringify({mapping: mapping, font_names: fontNames}))
+
     } else {
         console.log(`Using cache for ${fileHtml}`);
         let contentMapping = fs.readFileSync(mappingPath, {encoding: 'utf8'});
-        mapping = JSON.parse(contentMapping);
+        const cachedMp = JSON.parse(contentMapping);
+        mapping = cachedMp.mapping;
+        fontNames = cachedMp.font_names;
+    }
+    for (let name of fontNames) {
+        const regex = new RegExp(name, 'g');
+        content = content.replace(regex, '')
     }
     console.log(`Replace character by font`);
-
     content = await replaceByFontMapping(content, mapping);
     const fileEdit = `${fileHtml.replace('.html', '_copy')}.html`
     fs.writeFileSync(fileEdit, content);
