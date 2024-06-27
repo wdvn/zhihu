@@ -178,9 +178,10 @@ async function main() {
     content = await replaceByFontMapping(content, mapping);
     const fileEdit = `${fileHtml.replace('.html', '_copy')}.html`
     fs.writeFileSync(fileEdit, content);
-    await captrueFileHtml(fileHtml);
-    await captrueFileHtml(fileEdit)
-    await drawDiffImg(fileHtml.replace('.html', '.png'), fileEdit.replace('.html', '.png'))
+    // chưa fix so sánh ảnh khi lệch size
+    // await captrueFileHtml(fileHtml);
+    // await captrueFileHtml(fileEdit)
+    // await drawDiffImg(fileHtml.replace('.html', '.png'), fileEdit.replace('.html', '.png'))
 
     console.log('Done!!!')
 }
