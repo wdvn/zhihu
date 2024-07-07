@@ -130,7 +130,7 @@ function rephrase(text) {
         ' ': 1,
     }
     if (nonWord[text[0]]) {
-        text = text[0] + rephrase(text.slice(1))
+        return  text[0] + rephrase(text.slice(1));
     }
 
     return toUpperCaseFirstLetter(text.trim());
