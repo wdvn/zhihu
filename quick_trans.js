@@ -46,7 +46,6 @@ function translatePhienAmSimple(text) {
 }
 
 //*******************UPDATE
-let libDicts = []
 let trieDict = null;
 let mergeDict = {};
 
@@ -93,16 +92,25 @@ function binarySearch(root, target) {
     return findLongestPrefix(root, target);
 }
 
+
 function tokenize(trie, dictionary, text) {
     let maxPrefix = '';
     let translated = []
+    let skip = false;
     while (0 < text.length) {
+        skip = false;
         maxPrefix = binarySearch(trie, text)
         if (!maxPrefix) {
+            skip = true
             maxPrefix = text[0]
+            let latinIndex = 1;
+            while (latinIndex < text.length && isNumberOrAlphabet(text[latinIndex])) {
+                maxPrefix += text[latinIndex]
+                latinIndex++
+            }
         }
         // check prefix in dictionary
-        if (dictionary[maxPrefix] === undefined) {
+        if (dictionary[maxPrefix] === undefined && !skip) {
             while (maxPrefix.length > 1) {
                 maxPrefix = maxPrefix.slice(0, -1);
                 if (dictionary[maxPrefix]) {
@@ -122,58 +130,61 @@ function tokenize(trie, dictionary, text) {
     return translated
 }
 
-function rephrase(text) {
+function rephrase(tokens) {
     let nonWord = {
         '"': 1,
         '[': 1,
         '{': 1,
         ' ': 1,
+        ',': 1,
+        '!': 1,
+        '?': 1,
+        ';': 1,
+        "'": 1,
+        '.': 1,
     }
-    if (nonWord[text[0]]) {
-        return  text[0] + rephrase(text.slice(1));
-    }
+    let result = [];
+    let i = 0;
+    let upper = false;
+    while (i < tokens.length && !upper) {
+        let word = tokens[i]
+        if (!nonWord[tokens[i]]) {
+            result.push(" ")
+            word = toUpperCaseFirstLetter(word)
+            upper = true
+        }
+        result.push(word)
+        i++
 
-    return toUpperCaseFirstLetter(text.trim());
+    }
+    while (i < tokens.length) {
+        if (!nonWord[tokens[i]]) {
+            result.push(" ")
+        }
+        result.push(tokens[i])
+        i++
+    }
+    return result.join("")
 }
 
 // Sử dụng
 // dictUserNames > dictNames > dictVP > dictPhienAm > ignore  "\u0528" + not in dict
 
-function translate(listDict, text) {
-    if (!trieDict) {
-        mergeDict = {
-            Han: [],
-            HanViet: {},
-        };
-        for (let i = 0; i < listDict.length; i++) {
-            if (!listDict[i].Han) {
-                continue
-            }
-            for (let word of listDict[i].Han) {
-                if (mergeDict.HanViet[word] !== undefined) {
-                    continue
-                }
-                mergeDict.Han.push(word)
-                mergeDict.HanViet[word] = listDict[i].HanViet[word].split("/")[0]
-            }
-        }
-        trieDict = buildTrie(mergeDict.Han)
-
-        console.log('FINSH INIT QT');
-    }
+function translate(trie, dictionary, text) {
     let lines = []
     for (let line of text.split("\n")) {
         // lines.push(line)
-        const tokens = tokenize(trieDict, mergeDict.HanViet, line.trim());
+        const tokens = tokenize(trie, dictionary, line.trim());
         // rephrase is optional
-        lines.push(rephrase(tokens.join(" ")))
+        lines.push(rephrase(tokens))
+
     }
     return lines.join("\n")
 
 }
 
-function translate2(text) {
-    if (libDicts.length === 0) {
+function initQT() {
+    if (!trieDict) {
         const dictSpecial = {
             Han: ["，", "“", " ”", "。", "、", '？', "的"],
             HanViet: {
@@ -186,13 +197,41 @@ function translate2(text) {
                 "的": "",
             }
         }
-        libDicts.push(dictSpecial)
-        libDicts.push(dictUserNames)
-        libDicts.push(dictNames)
-        libDicts.push(dictVP)
-        libDicts.push(dictPhienAm)
+        let listDict = [];
+        listDict.push(dictSpecial)
+        listDict.push(dictUserNames)
+        listDict.push(dictNames)
+        listDict.push(dictVP)
+        listDict.push(dictPhienAm)
+        let book = {
+            Han: [],
+            HanViet: {},
+        };
+        for (let i = 0; i < listDict.length; i++) {
+            if (!listDict[i].Han) {
+                continue
+            }
+            for (let word of listDict[i].Han) {
+                if (book.HanViet[word] !== undefined) {
+                    continue
+                }
+                book.Han.push(word)
+                book.HanViet[word] = listDict[i].HanViet[word].split("/")[0]
+            }
+        }
+        trieDict = buildTrie(book.Han)
+        mergeDict = book
+        console.log("dictUserNames", dictUserNames)
+        console.log('dictNames', dictNames)
+        console.log('dictVP', dictVP)
+        console.log('dictVP', dictPhienAm)
+        console.log('FINSH INIT QT', book.HanViet);
     }
-    return translate(libDicts, text)
+}
+
+function translate2(text) {
+    initQT()
+    return translate(trieDict, mergeDict.HanViet, text)
 }
 
 //*******************END UPDATE
@@ -939,7 +978,7 @@ async function initVP() {
         }
         console.log(dictReady);
     }
-    ;
+
     db.close();
     getListNamesToTextarea();
 }
