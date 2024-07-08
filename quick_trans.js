@@ -56,6 +56,32 @@ class TrieNode {
     }
 }
 
+// muốn xóa từ khỏi từ Trie dùng
+// deleteHelper(trieDict,'từ muốn xóa')
+function deleteHelper(node, word, index=0) {
+    if (index === word.length) {
+        if (!node.isEndOfWord) {
+            return false;
+        }
+        node.isEndOfWord = false;
+        return Object.keys(node.children).length === 0;
+    }
+
+    const char = word[index];
+    const child = node.children[char];
+    if (!child) {
+        return false;
+    }
+
+    const shouldDeleteChild = deleteHelper(child, word, index + 1);
+    if (shouldDeleteChild) {
+        delete node.children[char];
+        return !node.isEndOfWord && Object.keys(node.children).length === 0;
+    }
+    return false;
+}
+
+
 function buildTrie(words) {
     let root = new TrieNode();
     for (let word of words) {
