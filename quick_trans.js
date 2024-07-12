@@ -58,7 +58,7 @@ class TrieNode {
 
 // muốn xóa từ khỏi từ Trie dùng
 // deleteHelper(trieDict,'từ muốn xóa')
-function deleteHelper(node, word, index=0) {
+function deleteHelper(node, word, index = 0) {
     if (index === word.length) {
         if (!node.isEndOfWord) {
             return false;
@@ -209,7 +209,8 @@ function translate(trie, dictionary, text) {
 
 }
 
-function initQT() {
+async function initQT(data) {
+    console.log(data)
     if (!trieDict) {
         const dictSpecial = {
             Han: ["，", "“", " ”", "。", "、", '？', "的"],
@@ -509,6 +510,7 @@ function escapeRegExp(string) {
 }
 
 function startTranslations() {
+    const start = performance.now();
     let listNames = document.getElementById("Names2").value.trim();
     dictUserNames = rawToDict(listNames);
     let new_chapter_title = capNames(1, translate2Result(chapter_title))
@@ -531,6 +533,8 @@ function startTranslations() {
         document.getElementById("author_say").innerHTML = VpToHTML(text3);
     }
     toggleEditor();
+    const end = performance.now();
+    console.log(`Execution time: ${end - start} ms`);
 }
 
 function loadOnSitePhienAm(dict = "https://rawcdn.githack.com/Moleys/VietPhrase/main/ChinesePhienAmWords.txt") {
@@ -551,13 +555,13 @@ function loadOnSiteVietphrase(dict = "https://rawcdn.githack.com/Moleys/VietPhra
     );
 }
 
-function loadOnSiteNames(dict = "https://rawcdn.githack.com/Moleys/VietPhrase/main/Names.txt") {
-    fetch(dict).then((res) => res.text()).then((data) => {
-            dictNames = rawToDict(data.trim());
-            dictReady.Names = true;
-            saveDictNames();
-        }
-    );
+async function loadOnSiteNames(dict = "https://rawcdn.githack.com/Moleys/VietPhrase/main/Names.txt") {
+    let res = await fetch(dict);
+    let data = await res.text();
+    dictNames = rawToDict(data.trim());
+    dictReady.Names = true;
+    saveDictNames();
+    return dictNames;
 }
 
 function checkTextInNames(text) {
@@ -954,6 +958,10 @@ function loadDictPhienAm() {
     ;
 }
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function initVP() {
     firstRun();
     const db = await new Promise((resolve, reject) => {
@@ -1004,9 +1012,13 @@ async function initVP() {
         }
         console.log(dictReady);
     }
+    while (!dictReady.Names && !dictReady.Vietphrase && !dictReady.PhienAm) {
+        await sleep(1000);
+    }
 
     db.close();
     getListNamesToTextarea();
+    await initQT();
 }
 
 initVP();
