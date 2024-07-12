@@ -1013,7 +1013,7 @@ async function initVP() {
         console.log(dictReady);
     }
     while (!dictReady.Names && !dictReady.Vietphrase && !dictReady.PhienAm) {
-        await sleep(1000);
+        await sleep(10);
     }
 
     db.close();
